@@ -1,16 +1,23 @@
 {application, feldstaerke,
- [{description, "An OTP application"},
+ [{description, "Erlang fieldforce telegram bot"},
   {vsn, "0.1.0"},
   {registered, []},
   {mod, { feldstaerke_app, []}},
   {applications,
    [kernel,
-    stdlib
+    stdlib,
+    inets,
+    lager,
+    cowboy,
+    jsx
    ]},
-  {env,[]},
+  {env,[
+    {token, "BOT_TOKEN_HERE"},
+    {ip, {127,0,0,1}},
+    {port, 7770}
+  ]},
   {modules, []},
-
-  {maintainers, []},
-  {licenses, ["Apache 2.0"]},
-  {links, []}
+  {maintainers, ["Nikita Kononenko"]},
+  {licenses, ["MIT"]},
+  {links, ["https://github.com/vmeansdev/fedlstaerke"]}
  ]}.

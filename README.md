@@ -1,7 +1,7 @@
 feldstaerke
 =====
 
-An OTP application
+Erlang fieldforce telegram bot
 
 Build
 -----
