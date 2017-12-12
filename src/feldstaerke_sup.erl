@@ -7,6 +7,8 @@
 
 -behaviour(supervisor).
 
+-include("feldstaerke.hrl").
+
 %% API
 -export([start_link/0]).
 
@@ -28,7 +30,14 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    {ok, { {one_for_all, 0, 1}, []} }.
+    log:info(?MFN, "Supervisor init called"),
+    {ok, { {one_for_one, 20, 10}, [
+        {feldstaerke_parser, {feldstaerke_parser, start_link, []},
+         permanent, 2000, worker, [feldstaerke_parser]},
+
+        {feldstaerke_processor, {feldstaerke_processor, start_link, []},
+         permanent, 2000, worker, [feldstaerke_processor]}
+    ]} }.
 
 %%====================================================================
 %% Internal functions
