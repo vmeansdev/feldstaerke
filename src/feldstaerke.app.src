@@ -7,12 +7,16 @@
    [kernel,
     stdlib,
     inets,
-    lager,
+%%    lager,
+    cowlib,
+    ranch,
     cowboy,
     jsx
    ]},
   {env,[
-    {token, "BOT_TOKEN_HERE"},
+    {wh_url, "https://5f186205.ngrok.io"},
+    {bot_url, "https://api.telegram.org/bot"},
+    {token, "482079650:AAFj23mlEG_ER_Q44DmUz33SZ10hQjDVcPQ"},
     {ip, {127,0,0,1}},
     {port, 7770}
   ]},
