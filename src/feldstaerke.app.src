@@ -7,7 +7,6 @@
    [kernel,
     stdlib,
     inets,
-%%    lager,
     cowlib,
     ranch,
     cowboy,
