@@ -11,11 +11,13 @@
 
 -behaviour(gen_server).
 
--include("feldstaerke.hrl").
+-include("../headers/feldstaerke.hrl").
 
 %% API
 -export([start_link/0,
-         process_msg/1]).
+         process_msg/1,
+         send_buttons/3,
+         request_location/3]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -50,6 +52,13 @@ start_link() ->
 -spec process_msg(message()) -> {reply, ok, []}.
 process_msg(Msg) ->
     gen_server:call(?SERVER, Msg).
+
+send_buttons(ChatID, Message, Shops) ->
+    Buttons = inline_buttons(Shops),
+    send_reply(ChatID, Message, Buttons).
+
+request_location(ChatID, Message, _ShopID) ->
+    send_reply(ChatID, Message, location_req()).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -96,11 +105,10 @@ handle_call(Request, _From, _State) ->
 
     case UserState of
         ?UNAUTHORIZED ->
+            log:info(?MFN, "Received message in unauthorized state"),
+            log:info(?MFN, MessageText),
             NormMsg = normalize_command(MessageText),
             reply_to_unauthorized(UserId, UserName, ChatId, NormMsg);
-        ?CHALLENGE_SENT ->
-            NormMsg = normalize_command(MessageText),
-            wait_for_password(UserId, UserName, ChatId, NormMsg);
         ?AUTHORIZED ->
             NormMsg = normalize_command(MessageText),
             handle_command(UserId, UserName, ChatId, NormMsg)
@@ -125,7 +133,6 @@ handle_cast(set_webhook, State) ->
         httpc:request(get, {SetWebHookURL, []}, [], []),
     log:info(?MFN, Body),
     {noreply, State}.
-
 
 %%--------------------------------------------------------------------
 %% @private
@@ -226,7 +233,6 @@ init_usertable() ->
 %% @doc return current user state from ETS
 -spec check_user_state(integer()) -> string().
 check_user_state(UserId) ->
-
     UserState = case ets:member(usertable, UserId) of
 
                     false ->
@@ -241,21 +247,34 @@ check_user_state(UserId) ->
     log:debug(?MFN, UserState),
     UserState.
 
-%% @doc Sends an authorization request to user
--spec send_authorization_request(integer(), [byte()], integer()) -> true.
-send_authorization_request(UserId, Username, ChatId) ->
-    send_reply(ChatId, Username ++ ", input your password, please!"),
-    ets:insert(usertable, {UserId, ?CHALLENGE_SENT}).
-
 %% @doc Sends message to certain chat id
+send_reply(ChatId, Reply, Options) ->
+    ErlBody = #{chat_id => ChatId,
+                text    => list_to_binary(Reply)},
+    log:info(?MFN, "Options"),
+    MergedBody = maps:merge(ErlBody, Options),
+    log:debug(?MFN, MergedBody),
+    send_reply(MergedBody).
+
 -spec send_reply(integer(), string()) -> ok.
 send_reply(ChatId, Reply) ->
+    ErlBody = #{chat_id => ChatId,
+                text    => list_to_binary(Reply)},
+    send_reply(ErlBody).
+
+send_reply(ErlBody) ->
     {ok, Path} = application:get_env(?APPLICATION, token),
-    httpc:request(post, {"https://api.telegram.org/bot"++Path++"/sendMessage",
-        [],
-        "application/x-www-form-urlencoded",
-        "chat_id=" ++ integer_to_list(ChatId) ++ "&text=" ++ Reply},
-        [], []),
+
+    Url = "https://api.telegram.org/bot"++Path++"/sendMessage",
+    Headers = [],
+    ContentType = "application/json",
+    Body = binary_to_list(jsx:encode(ErlBody)),
+
+    log:debug(?MFN,Body),
+
+    Request = {Url, Headers, ContentType, Body},
+    log:debug(?MFN, Request),
+    httpc:request(post, Request, [], []),
     ok.
 
 %% @doc Authorize user - change state to "authorized"
@@ -263,28 +282,41 @@ send_reply(ChatId, Reply) ->
 do_authorization(UserId) ->
     ets:insert(usertable, {UserId, ?AUTHORIZED}).
 
-
 %% @doc Cut @<bot_name> from message
 -spec normalize_command([byte()]) -> [byte()].
 normalize_command(Command) ->
+    log:info(?MFN, Command),
     lists:nth(1, re:split(Command, "[@]", [{return, list}])).
 
 %% @doc Reply for unauthorized user
-reply_to_unauthorized(UserId, Username, ChatId, "/start") ->
-    send_authorization_request(UserId, Username, ChatId);
+reply_to_unauthorized(UserId, _Username, ChatId, "/start") ->
+    do_authorization(UserId),
+    log:debug(?MFN, "Now call shopsm start_link.."),
+    feldstaerke_shopsm:show_shop_list(ChatId),
+    ok;
 
 reply_to_unauthorized(_UserId, _Username, ChatId, _) ->
-    send_reply(ChatId, "Begin with /start").
+    send_reply(ChatId, "Hello, fellow!\n\nIt is a proof of concept of fieldforce bot written in Erlang!\n\nBegin with /start").
 
-%% @doc Requesting password
-wait_for_password(UserId, Username, ChatId, "/auth") ->
-    do_authorization(UserId),
-    Reply = Username ++ ", authorization complete, waiting for commands...",
-    send_reply(ChatId, Reply);
+inline_buttons(Buttons) ->
+    ErlTerm = #{reply_markup =>
+    #{inline_keyboard =>
+            [[#{text => list_to_binary(Text), callback_data => integer_to_binary(CD)}]
+             || #{address := Text, id := CD} <- Buttons
+            ]
+        }
+    },
+    ErlTerm.
 
-wait_for_password(_UserId, Username, ChatId, _) ->
-    Reply = Username ++ ", password incorrect",
-    send_reply(ChatId, Reply).
+location_req() ->
+    #{reply_markup =>
+        #{one_time_keyboard => true,
+          keyboard => [[#{
+              text => <<"Send us your location to prove you are there">>,
+              request_location => true
+          }]]
+        }
+    }.
 
 %% ------------------------------------------------------------------
 %% Command Handlers
@@ -293,15 +325,21 @@ wait_for_password(_UserId, Username, ChatId, _) ->
 handle_command(_UserId, _Username, ChatId, "/start") ->
     send_reply(ChatId, "Session already started.");
 
-handle_command(_UserId, _Username, ChatId, "/auth") ->
-    send_reply(ChatId, "Already authorized.");
-
 handle_command(_UserId, _Username, ChatId, "/help") ->
-    send_reply(ChatId, "No real goals, just for fun.");
+    send_reply(ChatId, "Commands available:\n\n/start - to start work with bot\n/shops - to see shops list to visit\n/exit to finish work");
+
+handle_command(_UserId, _Username, ChatId, "/shops") ->
+    feldstaerke_shopsm:show_shop_list(ChatId),
+    ok;
 
 handle_command(UserId, Username, ChatId, "/exit") ->
     ets:insert(usertable, {UserId, "unauthorized"}),
     send_reply(ChatId, Username ++ ", logout complete.");
 
+handle_command(_UserId, _Username, _ChatId, "EnterShopID = " ++ ShopID0) ->
+    ShopID = list_to_integer(ShopID0),
+    feldstaerke_shopsm:request_user_location(ShopID),
+    ok;
+
 handle_command(_UserId, _Username, ChatId, _) ->
-    send_reply(ChatId, "Not implemented.").
+    send_reply(ChatId, "Oops! Don't know such command.\n\nUse /help to see what I can").

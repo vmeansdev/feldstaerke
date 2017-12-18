@@ -6,7 +6,7 @@
 -module(feldstaerke_app).
 
 -behaviour(application).
--include("feldstaerke.hrl").
+-include("./headers/feldstaerke.hrl").
 
 %% Application callbacks
 -export([start/2, stop/1]).

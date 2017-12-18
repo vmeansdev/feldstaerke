@@ -9,7 +9,7 @@
 -module(bot_cowboy_handler).
 -author("vmeansdev").
 
--include("feldstaerke.hrl").
+-include("../headers/feldstaerke.hrl").
 
 %% API
 -export([init/2]).

@@ -7,7 +7,7 @@
 
 -behaviour(supervisor).
 
--include("feldstaerke.hrl").
+-include("./headers/feldstaerke.hrl").
 
 %% API
 -export([start_link/0]).
@@ -36,7 +36,10 @@ init([]) ->
          permanent, 2000, worker, [feldstaerke_parser]},
 
         {feldstaerke_processor, {feldstaerke_processor, start_link, []},
-         permanent, 2000, worker, [feldstaerke_processor]}
+         permanent, 2000, worker, [feldstaerke_processor]},
+
+        {feldstaerke_shopsm, {feldstaerke_shopsm, start_link, []},
+         permanent, 2000, worker, [feldstaerke_shopsm]}
     ]} }.
 
 %%====================================================================
