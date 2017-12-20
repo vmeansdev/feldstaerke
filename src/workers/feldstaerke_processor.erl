@@ -110,9 +110,12 @@ normalize_command(Command) ->
 reply_to_unauthorized(UserId, _Username, ChatId, "/start") ->
     do_authorization(UserId),
     log:debug(?MFN, "Now call shopsm start_link.."),
-    feldstaerke_shopsm:start_link(UserId),
-    Pid = gproc:lookup_local_name(UserId),
-    log:debug(?MFN, Pid),
+    Spec = {feldstaerke_shopsm, {feldstaerke_shopsm, start_link, [UserId]},
+                 permanent, 2000, worker, [feldstaerke_shopsm]},
+    {ok, Pid} = supervisor:start_child(feldstaerke_sup, Spec),
+    Pid1 = gproc:lookup_local_name({userid,UserId}),
+    log:debug(?MFN, Pid1),
+    io:format("SHOPSM CREATED WITH PID: ~p~n", [Pid]),
     feldstaerke_shopsm:show_shop_list(Pid, ChatId),
     ok;
 
@@ -151,16 +154,14 @@ handle_command(_UserId, _Username, ChatId, "/help") ->
 
 handle_command(UserId, _Username, ChatId, "/shops") ->
     log:debug(?MFN, UserId),
-    Pid = grpoc:lookup_local_name(UserId),
+    Pid = gproc:lookup_local_name(UserId),
     log:debug(?MFN, Pid),
     feldstaerke_shopsm:show_shop_list(Pid, ChatId),
     ok;
 
 handle_command(UserId, Username, ChatId, "/exit") ->
     ets:insert(usertable, {UserId, "unauthorized"}),
-    log:debug(?MFN, UserId),
-    Pid = grpoc:lookup_local_name(UserId),
-    log:debug(?MFN, Pid),
+    Pid = gproc:lookup_local_name(UserId),
     feldstaerke_shopsm:stop(Pid),
     gproc:unregister_name(UserId),
     send_reply(ChatId, Username ++ ", logout complete.");

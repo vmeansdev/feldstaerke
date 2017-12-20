@@ -52,7 +52,7 @@ request_user_location(Pid, ShopID) ->
 %%%===================================================================
 init([Name]) ->
     log:info(?MFN, Name),
-    gproc:add_local_name(Name),
+    true = gproc:add_local_name(Name),
     {ok, wait_for_action, {}}.
 
 wait_for_action(Event, State0) ->
