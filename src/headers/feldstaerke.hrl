@@ -3,4 +3,3 @@
 
 -define(UNAUTHORIZED,   "unauthorized").
 -define(AUTHORIZED,     "authorized").
--define(CHALLENGE_SENT, "challenge_sent").
