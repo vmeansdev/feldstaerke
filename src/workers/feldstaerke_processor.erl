@@ -110,17 +110,20 @@ normalize_command(Command) ->
 reply_to_unauthorized(UserId, _Username, ChatId, "/start") ->
     do_authorization(UserId),
     log:debug(?MFN, "Now call shopsm start_link.."),
-    Spec = {feldstaerke_shopsm, {feldstaerke_shopsm, start_link, [UserId]},
-                 permanent, 2000, worker, [feldstaerke_shopsm]},
-    {ok, Pid} = supervisor:start_child(feldstaerke_sup, Spec),
-    Pid1 = gproc:lookup_local_name({userid,UserId}),
-    log:debug(?MFN, Pid1),
-    io:format("SHOPSM CREATED WITH PID: ~p~n", [Pid]),
+    {ok, Pid} = start_shop_fsm_for(UserId),
     feldstaerke_shopsm:show_shop_list(Pid, ChatId),
     ok;
 
 reply_to_unauthorized(_UserId, _Username, ChatId, _) ->
     send_reply(ChatId, "Hello, fellow!\n\nIt is a proof of concept of fieldforce bot written in Erlang!\n\nBegin with /start").
+
+start_shop_fsm_for(UserId) ->
+    Restart = permanent,
+    Shutdown = 2000,
+    Type = worker,
+    Spec = {feldstaerke_shopsm, {feldstaerke_shopsm, start_link, [UserId]},
+        Restart, Shutdown, Type, [feldstaerke_shopsm]},
+    supervisor:start_child(feldstaerke_sup, Spec).
 
 inline_buttons(Buttons) ->
     ErlTerm = #{reply_markup =>
