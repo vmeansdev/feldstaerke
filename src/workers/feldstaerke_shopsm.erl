@@ -14,8 +14,8 @@
 -include("../headers/feldstaerke.hrl").
 
 %% API
--export([start_link/0, stop/0]).
--export([show_shop_list/1, request_user_location/1]).
+-export([start_link/1, stop/1]).
+-export([show_shop_list/2, request_user_location/2]).
 
 %% gen_fsm callbacks
 -export([init/1,
@@ -35,35 +35,40 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
-start_link() ->
-    gen_fsm:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(Name) ->
+    gen_fsm:start_link(?MODULE, [Name], []).
 
-stop() ->
-    gen_fsm:send_all_state_event(?SERVER, stop).
+stop(Pid) ->
+    gen_fsm:send_all_state_event(Pid, stop).
 
-show_shop_list(ChatID) ->
-    gen_fsm:send_event(?SERVER, {shop_choosing, ChatID}).
+show_shop_list(Pid, ChatID) ->
+    gen_fsm:send_event(Pid, {shop_choosing, ChatID}).
 
-request_user_location(ShopID) ->
-    gen_fsm:send_event(?SERVER, {chosen, ShopID}).
+request_user_location(Pid, ShopID) ->
+    gen_fsm:send_event(Pid, {chosen, ShopID}).
 
 %%%===================================================================
 %%% gen_fsm callbacks
 %%%===================================================================
-init([]) ->
+init([Name]) ->
+    log:info(?MFN, Name),
+    gproc:add_local_name(Name),
     {ok, wait_for_action, {}}.
 
-wait_for_action(Event, _State0) ->
+wait_for_action(Event, State0) ->
+    io:format("SHOPSM wait_for_action called!~n"),
     case Event of
         {shop_choosing, ChatID} ->
             State = #state{shops = default_shop_list(), chat_id = ChatID},
             choose_shop(State),
             {next_state, shop_choosing, State};
         _ ->
-            log:debug(?MFN, "hanlded wildcard event")
+            log:debug(?MFN, "hanlded wildcard event"),
+            {next_state, wait_for_action, State0}
     end.
 
 shop_choosing(Event, State) ->
+    io:format("SHOPSM shop_choosing called!~n"),
     case Event of
         {chosen, ShopID} ->
             io:format("Great choice! ~p~n", [ShopID]),
@@ -76,13 +81,14 @@ shop_choosing(Event, State) ->
     end.
 
 location_requesting(Event, State) ->
+    io:format("SHOPSM location_requesting called~n"),
     case Event of
         _ ->
-
-            {next_state, items_reporting, State}
+        {next_state, location_requesting, State}
     end.
 
 handle_event(stop, _StateName, State) ->
+    io:format("SHOPSHM STOP CALLED!~n"),
     {stop, normal, State};
 handle_event(_Event, StateName, State) ->
     {next_state, StateName, State}.
@@ -95,6 +101,7 @@ handle_info(_Info, StateName, State) ->
     {next_state, StateName, State}.
 
 terminate(_Reason, _StateName, _State) ->
+    io:format("SHOPSM TERMINATE CALLED!~n"),
     ok.
 
 code_change(_OldVsn, StateName, State, _Extra) ->
