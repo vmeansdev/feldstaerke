@@ -31,16 +31,7 @@ start_link() ->
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
     log:info(?MFN, "Supervisor init called"),
-    {ok, { {one_for_one, 20, 10}, [
-        {feldstaerke_parser, {feldstaerke_parser, start_link, []},
-         permanent, 2000, worker, [feldstaerke_parser]},
-
-        {feldstaerke_processor, {feldstaerke_processor, start_link, []},
-         permanent, 2000, worker, [feldstaerke_processor]},
-
-        {feldstaerke_shopsm, {feldstaerke_shopsm, start_link, []},
-         permanent, 2000, worker, [feldstaerke_shopsm]}
-    ]} }.
+    {ok, { {one_for_one, 20, 10}, []} }.
 
 %%====================================================================
 %% Internal functions
